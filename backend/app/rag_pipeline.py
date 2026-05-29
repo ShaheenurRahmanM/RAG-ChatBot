@@ -10,9 +10,14 @@ try:
     # Try newer import path first
     from langchain.chains import create_retrieval_chain, create_stuff_documents_chain
 except ImportError:
-    # Fall back to older import path
-    from langchain.chains.retrieval import create_retrieval_chain
-    from langchain.chains.combine_documents import create_stuff_documents_chain
+    try:
+        # Fall back to older import path
+        from langchain.chains.retrieval import create_retrieval_chain
+        from langchain.chains.combine_documents import create_stuff_documents_chain
+    except ImportError:
+        # Fall back to langchain_classic (which is installed in this env)
+        from langchain_classic.chains.retrieval import create_retrieval_chain
+        from langchain_classic.chains.combine_documents.stuff import create_stuff_documents_chain
 
 try:
     from langchain_core.prompts import ChatPromptTemplate

@@ -2,18 +2,20 @@
 FastAPI application for SWS AI Policy Assistant
 Main application with RAG-powered chat endpoints
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import sys
 import os
+import shutil
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
-from config import CORS_ORIGINS
+from config import CORS_ORIGINS, PDF_DATA_PATH
 from rag_pipeline import get_rag_pipeline
+from ingest import ingest_single_pdf
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -94,6 +96,7 @@ async def health_check():
                 return HealthResponse(
                     status="warning",
                 message="RAG pipeline is ready but no documents have been ingested. Please run: py app/ingest.py"
+                )
             return HealthResponse(
                 status="ok",
                 message=f"RAG pipeline is ready with {doc_count} document chunks"
@@ -190,6 +193,36 @@ async def chat(request: ChatRequest):
             status_code=500,
             detail=f"Error processing question: {str(e)}"
         )
+
+
+@app.post("/api/upload", tags=["Upload"])
+async def upload_pdf(file: UploadFile = File(...)):
+    """
+    Upload a PDF file and ingest it into the RAG pipeline
+    """
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    file_path = os.path.join(PDF_DATA_PATH, file.filename)
+    
+    try:
+        # Create directory if it doesn't exist
+        os.makedirs(PDF_DATA_PATH, exist_ok=True)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Ingest the single pdf
+        success = ingest_single_pdf(file_path)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to extract text or ingest PDF. Make sure it's a valid text-based PDF.")
+            
+        return {"message": f"Successfully uploaded and ingested {file.filename}", "filename": file.filename}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in upload endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
 
 
 # ============================================================================

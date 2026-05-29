@@ -3,10 +3,19 @@ Document ingestion pipeline for PDF processing and embedding generation
 """
 import sys
 from typing import List
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except ImportError:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain.schema import Document
+
+try:
+    from langchain_core.documents import Document
+except ImportError:
+    from langchain.schema import Document
 
 from config import (
     CHUNK_SIZE,
@@ -165,6 +174,68 @@ def create_embeddings_and_store():
         
     except Exception as e:
         print(f"\n❌ Error during ingestion: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def ingest_single_pdf(pdf_path: str) -> bool:
+    """
+    Ingest a single PDF file and add it to the existing ChromaDB
+    
+    Args:
+        pdf_path: Path to the PDF file
+        
+    Returns:
+        Boolean indicating success
+    """
+    try:
+        print(f"\nProcessing single file: {pdf_path}")
+        ensure_directory_exists(CHROMA_DB_PATH)
+        
+        pdf_data = extract_text_from_pdf(pdf_path)
+        if not pdf_data:
+            print(f"Failed to extract text from {pdf_path}")
+            return False
+            
+        documents = []
+        pdf_name = pdf_data["name"]
+        pages = pdf_data["pages"]
+        
+        for page in pages:
+            doc = Document(
+                page_content=page["text"],
+                metadata={
+                    "source": pdf_name,
+                    "page": page["page_number"],
+                    "chunk_index": 0
+                }
+            )
+            documents.append(doc)
+            
+        if not documents:
+            return False
+            
+        split_docs = split_documents(documents)
+        
+        embeddings = HuggingFaceEmbeddings(
+            model_name=EMBEDDING_MODEL,
+            model_kwargs={"device": "cpu"}
+        )
+        
+        vector_store = Chroma.from_documents(
+            documents=split_docs,
+            embedding=embeddings,
+            collection_name=CHROMA_COLLECTION_NAME,
+            persist_directory=CHROMA_DB_PATH
+        )
+        
+        print(f"✓ Successfully stored {len(split_docs)} chunks from {pdf_name} in ChromaDB")
+        
+        # If rag pipeline is loaded globally, we might want to refresh it, but it should auto-fetch from DB
+        return True
+    except Exception as e:
+        print(f"\n❌ Error during single ingestion: {str(e)}")
         import traceback
         traceback.print_exc()
         return False

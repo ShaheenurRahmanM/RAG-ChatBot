@@ -5,6 +5,7 @@
 
 import Header from './components/Header';
 import ChatBox from './components/ChatBox';
+import FileUpload from './components/FileUpload';
 import './App.css';
 
 export function App() {
@@ -12,7 +13,10 @@ export function App() {
     <div className="app">
       <Header />
       <main className="main-content">
-        <ChatBox />
+        <div className="app-container">
+          <FileUpload />
+          <ChatBox />
+        </div>
       </main>
     </div>
   );

@@ -19,6 +19,6 @@ Context from company documents:
 Answer the user's question based ONLY on the above context."""
 
 # User prompt template
-USER_PROMPT_TEMPLATE = """Question: {question}
+USER_PROMPT_TEMPLATE = """Question: {input}
 
 Based on the company documents provided above, please answer this question. Remember to only use information from the provided context."""
